@@ -1,4 +1,4 @@
-name: Update Country.mmdb (MaxMind GeoLite2)
+name: Update Country.mmdb & ASN.mmdb (MaxMind GeoLite2)
 
 on:
   workflow_dispatch:
@@ -12,28 +12,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download GeoLite2-Country tarball from MaxMind
+      - name: Download & Build Country.mmdb
         env:
           LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
         run: |
           set -e
-          rm -rf tmp
-          mkdir -p tmp
+          rm -rf tmp_country
+          mkdir -p tmp_country
 
-          curl -L -o tmp/GeoLite2-Country.tar.gz \
+          curl -L -o tmp_country/GeoLite2-Country.tar.gz \
             "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key=${LICENSE_KEY}&suffix=tar.gz"
 
-          tar -xzf tmp/GeoLite2-Country.tar.gz -C tmp
+          tar -xzf tmp_country/GeoLite2-Country.tar.gz -C tmp_country
 
-          # 找到解压出来的 mmdb
-          MMDB_PATH="$(find tmp -type f -name '*.mmdb' | head -n 1)"
-          echo "Found mmdb: ${MMDB_PATH}"
-
-          # 输出成固定文件名（放仓库根目录）
+          MMDB_PATH="$(find tmp_country -type f -name '*.mmdb' | head -n 1)"
+          echo "Country mmdb: ${MMDB_PATH}"
           cp "${MMDB_PATH}" Country.mmdb
 
-          # 清理
-          rm -rf tmp
+          rm -rf tmp_country
+
+      - name: Download & Build ASN.mmdb
+        env:
+          LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+        run: |
+          set -e
+          rm -rf tmp_asn
+          mkdir -p tmp_asn
+
+          curl -L -o tmp_asn/GeoLite2-ASN.tar.gz \
+            "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-ASN&license_key=${LICENSE_KEY}&suffix=tar.gz"
+
+          tar -xzf tmp_asn/GeoLite2-ASN.tar.gz -C tmp_asn
+
+          MMDB_PATH="$(find tmp_asn -type f -name '*.mmdb' | head -n 1)"
+          echo "ASN mmdb: ${MMDB_PATH}"
+          cp "${MMDB_PATH}" ASN.mmdb
+
+          rm -rf tmp_asn
 
       - name: Commit & push if changed
         run: |
@@ -41,6 +56,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git add Country.mmdb
-          git commit -m "Update Country.mmdb" || echo "No changes"
+          git add Country.mmdb ASN.mmdb
+          git commit -m "Update Country.mmdb & ASN.mmdb" || echo "No changes"
           git push
