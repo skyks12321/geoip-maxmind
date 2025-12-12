@@ -1,0 +1,33 @@
+name: Download MaxMind GeoLite2
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"  # 每天 UTC 03:00 自动更新（可改）
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download GeoLite2-Country from MaxMind
+        env:
+          LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+        run: |
+          set -e
+          mkdir -p data
+          curl -L -o data/GeoLite2-Country.tar.gz \
+            "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key=${LICENSE_KEY}&suffix=tar.gz"
+
+          tar -xzf data/GeoLite2-Country.tar.gz -C data
+          ls -lah data
+
+      - name: Commit files
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data || true
+          git commit -m "Update GeoLite2 database" || echo "No changes"
+          git push
