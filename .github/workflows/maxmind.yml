@@ -1,61 +1,46 @@
-name: Update Country.mmdb & ASN.mmdb (MaxMind GeoLite2)
+name: Update MaxMind GeoLite2 MMDB
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *" # 每天 UTC 03:00
+    - cron: "0 3 * * *"   # 每天 UTC 03:00
 
 jobs:
-  build:
+  update:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Build Country.mmdb
-        env:
-          LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+      - name: Prepare directories
         run: |
-          set -e
-          rm -rf tmp_country
-          mkdir -p tmp_country
+          mkdir -p GeoLite2 tmp
 
-          curl -L -o tmp_country/GeoLite2-Country.tar.gz \
-            "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key=${LICENSE_KEY}&suffix=tar.gz"
-
-          tar -xzf tmp_country/GeoLite2-Country.tar.gz -C tmp_country
-
-          MMDB_PATH="$(find tmp_country -type f -name '*.mmdb' | head -n 1)"
-          echo "Country mmdb: ${MMDB_PATH}"
-          cp "${MMDB_PATH}" Country.mmdb
-
-          rm -rf tmp_country
-
-      - name: Download & Build ASN.mmdb
-        env:
-          LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+      - name: Download GeoLite2 Country
         run: |
-          set -e
-          rm -rf tmp_asn
-          mkdir -p tmp_asn
+          curl -L \
+            "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key=${{ secrets.MAXMIND_LICENSE_KEY }}&suffix=tar.gz" \
+            -o tmp/country.tar.gz
 
-          curl -L -o tmp_asn/GeoLite2-ASN.tar.gz \
-            "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-ASN&license_key=${LICENSE_KEY}&suffix=tar.gz"
-
-          tar -xzf tmp_asn/GeoLite2-ASN.tar.gz -C tmp_asn
-
-          MMDB_PATH="$(find tmp_asn -type f -name '*.mmdb' | head -n 1)"
-          echo "ASN mmdb: ${MMDB_PATH}"
-          cp "${MMDB_PATH}" ASN.mmdb
-
-          rm -rf tmp_asn
-
-      - name: Commit & push if changed
+      - name: Download GeoLite2 ASN
         run: |
-          set -e
+          curl -L \
+            "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-ASN&license_key=${{ secrets.MAXMIND_LICENSE_KEY }}&suffix=tar.gz" \
+            -o tmp/asn.tar.gz
+
+      - name: Extract mmdb
+        run: |
+          tar -xzf tmp/country.tar.gz -C tmp
+          tar -xzf tmp/asn.tar.gz -C tmp
+
+          find tmp -name "*.mmdb" | grep Country | xargs -I {} cp {} GeoLite2/Country.mmdb
+          find tmp -name "*.mmdb" | grep ASN | xargs -I {} cp {} GeoLite2/ASN.mmdb
+
+      - name: Commit & Push
+        run: |
           git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-
-          git add Country.mmdb ASN.mmdb
-          git commit -m "Update Country.mmdb & ASN.mmdb" || echo "No changes"
+          git config user.email "actions@github.com"
+          git add GeoLite2/*.mmdb
+          git commit -m "Update GeoLite2 MMDB" || exit 0
           git push
